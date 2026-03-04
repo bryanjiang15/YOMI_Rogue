@@ -18,7 +18,7 @@ func _init(moves: Array, should_loop: bool = false):
 # Returns the next move dict if the next action in the sequence is available
 # in ctx.available_moves, or null if the combo is finished / action unavailable.
 # Automatically advances the internal index on success and resets on failure.
-func next_move(ctx) -> Dictionary:
+func next_move(ctx):
 	if sequence.empty():
 		return null
 

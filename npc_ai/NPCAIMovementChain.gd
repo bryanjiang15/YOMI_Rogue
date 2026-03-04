@@ -22,7 +22,7 @@ func then_planner(fn) -> NPCAIMovementChain:
 # Returns the next move in the chain, or null if the chain is finished.
 # Consumes the step only if the required action is available.
 # If a step's action is unavailable the chain is aborted (game state changed).
-func next_move(ctx) -> Dictionary:
+func next_move(ctx):
 	if _steps.empty():
 		return null
 

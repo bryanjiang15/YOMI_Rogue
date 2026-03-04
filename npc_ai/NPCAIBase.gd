@@ -57,10 +57,6 @@ func _apply_result(result: Dictionary, ctx):
 	target_player.queued_data   = _last_data
 	target_player.queued_extra  = _last_extra
 
-	var main = _get_main()
-	if main:
-		main.call_deferred("_start_ghost")
-
 
 # Re-apply the AI's choice whenever ActionButtons fires action_selected.
 # This mirrors AIController._edit_queue (lines 127-130) and prevents the

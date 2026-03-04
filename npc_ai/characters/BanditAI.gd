@@ -1,13 +1,15 @@
 # BanditAI — melee NPC AI for the Bandit character.
 #
 # Behavior:
-#   Approach  — close distance using dashes and forward jumps
+#   Approach  — close distance toward initial-attack range (movement only)
+#   Attack    — use initial attack (e.g. GroundedPunch) when in range
 #   Pressure  — cycle a punch combo; fall back to any available normal attack
 #   Defensive — burst out of combos; roll away when low HP
 #
 # State transitions:
-#   Approach  → Pressure   when within melee range (160 units)
+#   Approach  → Attack     when in range for initial attack
 #   Approach  → Defensive  when taken into a combo
+#   Attack    → Pressure   when within melee range (160 units)
 #   Pressure  → Defensive  when HP drops below 30%
 #   Pressure  → Approach   when opponent escapes to mid range (250 units)
 #   Defensive → Approach   when safe (not in combo, HP above 40%) OR opponent very far
@@ -18,6 +20,11 @@ extends NPCAIStateMachine
 # the available attack is whatever button state name Bandit exposes.
 # Replace these names with the actual state names from Bandit.tscn if they differ.
 const BURST_ACTION = "Burst"
+
+const INITIAL_ATTACK = "GroundedPunch"
+const INITIAL_ATTACK_RANGE = 160.0
+const TOLERANCE_CLOSER = 0.65
+const TOLERANCE_FURTHER_PX = 35.0
 
 # Combo sequence — these are placeholder names; update to match actual Bandit state names.
 # If a step's action isn't available the combo resets automatically (NPCAICombo behaviour).
@@ -32,6 +39,11 @@ func _ready():
 	var approach  = _ApproachState.new()
 	approach.state_name = "Approach"
 	approach.planner    = _planner
+	approach.attack_range = INITIAL_ATTACK_RANGE
+
+	var attack = _AttackState.new()
+	attack.state_name = "Attack"
+	attack.initial_attack = INITIAL_ATTACK
 
 	var pressure  = _PressureState.new()
 	pressure.state_name = "Pressure"
@@ -43,8 +55,12 @@ func _ready():
 	defensive.planner    = _planner
 
 	# ── Wire transitions ──────────────────────────────────────────────────────
-	approach.add_transition(_cond.close_to(160.0),    "Pressure")
-	approach.add_transition(_cond.being_comboed(),    "Defensive")
+	var in_attack_range_low = INITIAL_ATTACK_RANGE * TOLERANCE_CLOSER
+	var in_attack_range_high = INITIAL_ATTACK_RANGE + TOLERANCE_FURTHER_PX
+	approach.add_transition(_cond.in_range_between(in_attack_range_low, in_attack_range_high), "Attack")
+	approach.add_transition(_cond.being_comboed(), "Defensive")
+
+	attack.add_transition(_cond.close_to(160.0), "Pressure")
 
 	pressure.add_transition(_cond.my_hp_below(0.30), "Defensive")
 	pressure.add_transition(_cond.far_from(250.0),   "Approach")
@@ -53,6 +69,7 @@ func _ready():
 
 	# ── Register (first added = initial state) ────────────────────────────────
 	add_state(approach)
+	add_state(attack)
 	add_state(pressure)
 	add_state(defensive)
 
@@ -72,10 +89,20 @@ func _build_extra(ctx) -> Dictionary:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class _ApproachState extends NPCAIState:
-	var planner  # NPCAIMovementPlanner
+	var planner      # NPCAIMovementPlanner
+	var attack_range: float = 140.0  # target distance; transition to Attack when in range
 
 	func get_move(ctx) -> Dictionary:
-		return planner.approach(ctx)
+		return planner.approach_toward_range(ctx, attack_range)
+
+
+class _AttackState extends NPCAIState:
+	var initial_attack: String = "PalmStrike"  # override per NPC (e.g. Bandit: "GroundedPunch")
+
+	func get_move(ctx) -> Dictionary:
+		if ctx.has_move(initial_attack):
+			return {"action": initial_attack, "data": null}
+		return {"action": "Continue", "data": null}
 
 
 class _PressureState extends NPCAIState:

@@ -56,8 +56,8 @@ func _init(player, game):
 
 	my_hp      = float(me.hp)
 	opp_hp     = float(opponent.hp)
-	my_hp_pct  = my_hp  / float(me.max_hp)      if me.max_hp      > 0 else 0.0
-	opp_hp_pct = opp_hp / float(opponent.max_hp) if opponent.max_hp > 0 else 0.0
+	my_hp_pct  = my_hp  / float(me.MAX_HEALTH)      if me.MAX_HEALTH      > 0 else 0.0
+	opp_hp_pct = opp_hp / float(opponent.MAX_HEALTH) if opponent.MAX_HEALTH > 0 else 0.0
 
 	# combo_count on the Fighter tracks how many hits the *opponent* has landed in
 	# the current combo against this fighter, so opponent.combo_count > 0 means I am

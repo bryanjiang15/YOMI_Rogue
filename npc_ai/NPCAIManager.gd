@@ -5,16 +5,22 @@ var controllers: Dictionary = {}
 
 # ── Character → AI script registry ───────────────────────────────────────────
 # Key:   the fighter's node name as it appears in its .tscn root node.
-# Value: preloaded GDScript that extends NPCAIBase (or a subclass).
+# Value: path to a GDScript that extends NPCAIBase (or a subclass).
 #
 # Add a new entry here whenever you create a new character AI:
-#   "MyCharName": preload("res://_YOMI_Rogue/npc_ai/characters/MyCharNameAI.gd")
+#   "MyCharName": "res://_YOMI_Rogue/npc_ai/characters/MyCharNameAI.gd"
 const CHARACTER_AI_MAP = {
-	"Bandit": preload("res://_YOMI_Rogue/npc_ai/characters/BanditAI.gd"),
+	"Bandit": "res://_YOMI_Rogue/npc_ai/characters/BanditAI.gd",
 }
 
-# Default fallback AI script used when the character has no entry in CHARACTER_AI_MAP.
-const DEFAULT_AI_SCRIPT = preload("res://_YOMI_Rogue/npc_ai/NPCAIBase.gd")
+# Default fallback script path used when the character has no entry in CHARACTER_AI_MAP.
+const DEFAULT_AI_SCRIPT_PATH = "res://_YOMI_Rogue/npc_ai/NPCAIBase.gd"
+
+# Whether players have been registered yet (deferred to first signal).
+var _registered: bool = false
+
+# Last game tick we notified controllers — avoid reacting twice in the same turn.
+var _last_actionable_tick: int = -1
 
 
 func _ready():
@@ -25,17 +31,32 @@ func _ready():
 		queue_free()
 		return
 
-	# player_actionable fires once per turn when all fighters need to pick their
-	# next action — the same signal AIController listens to.
 	game.connect("player_actionable", self, "_on_player_actionable")
 
-	# game.players is populated during game._ready(); we connect after so that
-	# by the time our _ready runs the players dictionary is already filled.
-	_register_npc_players(game)
+
+func _on_player_actionable():
+	var game = get_parent()
+	if game.current_tick == _last_actionable_tick:
+		return
+	_last_actionable_tick = game.current_tick
+
+	# Lazy first-turn registration — players are ready by now.
+	if not _registered:
+		_register_npc_players(game)
+		_registered = true
+
+	for controller in controllers.values():
+		if is_instance_valid(controller):
+			controller.on_player_actionable()
 
 
 func _register_npc_players(game):
-	for player in game.players.values():
+	# Standard matches use player ids 1 and 2.
+	# game.get_player(id) returns null for any slot that doesn't exist.
+	for id in [1, 2]:
+		var player = game.get_player(id)
+		if player == null:
+			continue
 		if not _should_control(player):
 			continue
 		var controller = _create_controller_for(player, game)
@@ -43,12 +64,6 @@ func _register_npc_players(game):
 		add_child(controller)
 		print("NPCAIManager: controlling player id ", player.id,
 			  " with ", controller.get_script().resource_path)
-
-
-func _on_player_actionable():
-	for controller in controllers.values():
-		if is_instance_valid(controller):
-			controller.on_player_actionable()
 
 
 # ── Overridable hooks ─────────────────────────────────────────────────────────
@@ -60,13 +75,27 @@ func _should_control(player) -> bool:
 	return player.id == 2
 
 
-func _create_controller_for(player, game) -> NPCAIBase:
-	# Look up the character-specific AI by matching the fighter's node name.
-	var char_name = player.get_name()
-	var script = CHARACTER_AI_MAP.get(char_name, DEFAULT_AI_SCRIPT)
+func _get_character_name(player) -> String:
+	# Match the player's script file against Global.name_paths (the game's own
+	# character registry).  Both the .tscn and .gd share the same base filename,
+	# so "res://…/Bandit.gd" and "res://…/Bandit.tscn" both reduce to "Bandit".
+	var script_base = player.get_script().resource_path.get_file().get_basename()
+	for name in Global.name_paths:
+		var scene_base = Global.name_paths[name].get_file().get_basename()
+		if scene_base == script_base:
+			return name
+	# Fallback: use the raw script filename (covers modded characters not in Global)
+	return script_base
+
+
+func _create_controller_for(player, game):
+	var char_name   = _get_character_name(player)
+	var script_path = CHARACTER_AI_MAP.get(char_name, DEFAULT_AI_SCRIPT_PATH)
+	var script      = load(script_path)
 
 	var ai = NPCAIBase.new()
-	ai.set_script(script)
+	if script:
+		ai.set_script(script)
 	ai.target_player = player
 	ai.game          = game
 	ai.manager       = self

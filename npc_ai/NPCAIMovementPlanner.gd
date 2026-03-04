@@ -12,12 +12,17 @@ class_name NPCAIMovementPlanner
 # ── Approach ──────────────────────────────────────────────────────────────────
 
 # Closes distance toward the opponent using whatever movement is available.
+# distance: desired range in game units; if > 0, approach only when farther than this
+# and hold (Continue) when within range. Default 0 means always approach.
 # Preference: DashForward > forward jump > short hop > AirDash > Run > Continue
-func approach(ctx) -> Dictionary:
+func approach(ctx, distance: float = 0.0) -> Dictionary:
+	if distance > 0 and ctx.distance <= distance:
+		return {"action": "Continue", "data": null}
+
 	if not ctx.i_am_airborne():
 		# Ground dash — use a shorter distance when almost in range to avoid over-committing
 		if ctx.has_move("DashForward"):
-			var dash_dist = 40 if ctx.is_close(ctx.RANGE_CLOSE * 1.4) else 100
+			var dash_dist = 40 if (distance > 0 and ctx.distance < distance + 80) or ctx.is_close(ctx.RANGE_CLOSE * 1.4) else 100
 			return {"action": "DashForward", "data": {"x": dash_dist}}
 
 		# Full forward jump to cover ground and create an aerial threat
@@ -31,6 +36,42 @@ func approach(ctx) -> Dictionary:
 			return {"action": "Run", "data": null}
 	else:
 		# Airborne — use an airdash toward the opponent if budget remains
+		if ctx.air_movements_left() > 0 and ctx.has_move("AirDash"):
+			return _airdash_toward(ctx)
+
+	return {"action": "Continue", "data": null}
+
+
+# Movement-only: approach until distance is within [target_range * tolerance_closer, target_range + tolerance_further_px].
+# Use this from Approach state; transition to Attack state when in range (e.g. via in_range_between).
+func approach_toward_range(ctx, target_range: float, tolerance_closer: float = 0.65, tolerance_further_px: float = 35.0) -> Dictionary:
+	var in_range_low = target_range * tolerance_closer
+	var in_range_high = target_range + tolerance_further_px
+	return _approach_toward_range(ctx, in_range_low, in_range_high)
+
+
+# Internal: approach until distance is within [in_range_low, in_range_high].
+# Uses shorter dashes when near the band so we don't overshoot with one move.
+func _approach_toward_range(ctx, in_range_low: float, in_range_high: float) -> Dictionary:
+	if ctx.distance <= in_range_high:
+		return {"action": "Continue", "data": null}
+
+	if not ctx.i_am_airborne():
+		if ctx.has_move("DashForward"):
+			# Prefer fewer moves: full dash when far; cap dash so we don't overshoot in_range_low
+			var max_dash = int(max(0, ctx.distance - in_range_low))
+			var dash_dist = min(100, max_dash) if ctx.distance >= in_range_high + 80 else min(40, max_dash)
+			dash_dist = clamp(dash_dist, 20, 100)
+			return {"action": "DashForward", "data": {"x": dash_dist}}
+
+		if ctx.has_move("Jump"):
+			if ctx.distance >= ctx.RANGE_MIDRANGE:
+				return {"action": "Jump", "data": ctx.jump_data(0.7, true, false)}
+			return {"action": "Jump", "data": ctx.jump_data(0.6, true, true)}
+
+		if ctx.has_move("Run"):
+			return {"action": "Run", "data": null}
+	else:
 		if ctx.air_movements_left() > 0 and ctx.has_move("AirDash"):
 			return _airdash_toward(ctx)
 

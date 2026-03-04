@@ -55,6 +55,20 @@ class SimpleCond extends Reference:
 		return _obj.call(fn_name, ctx)
 
 
+class RangeCond extends Reference:
+	var low: float
+	var high: float
+	var _obj
+
+	func _init(obj, low_val: float, high_val: float):
+		_obj = obj
+		low  = low_val
+		high = high_val
+
+	func call_func(ctx) -> bool:
+		return _obj.call("_eval_in_range_between", ctx, low, high)
+
+
 # ── Public factory methods ────────────────────────────────────────────────────
 
 func close_to(dist: float):
@@ -89,6 +103,10 @@ func opp_is_airborne():
 
 func is_cornered():
 	return SimpleCond.new(self, "_eval_is_cornered")
+
+# True when low <= ctx.distance <= high (e.g. in range for initial attack).
+func in_range_between(low: float, high: float):
+	return RangeCond.new(self, low, high)
 
 
 # ── Evaluation methods (called via .call()) ───────────────────────────────────
@@ -125,3 +143,6 @@ func _eval_opp_is_airborne(ctx) -> bool:
 
 func _eval_is_cornered(ctx) -> bool:
 	return ctx.is_cornered()
+
+func _eval_in_range_between(ctx, low: float, high: float) -> bool:
+	return ctx.distance >= low and ctx.distance <= high

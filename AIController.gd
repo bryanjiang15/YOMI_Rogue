@@ -105,7 +105,7 @@ func _ready():
 
 func debug_print(message):
 	# Uncomment this for a "thought process" breakbown
-	#print(message)
+	# print(message)
 	pass
 
 		
