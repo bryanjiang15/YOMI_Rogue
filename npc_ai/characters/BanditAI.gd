@@ -22,9 +22,9 @@ extends NPCAIStateMachine
 const BURST_ACTION = "Burst"
 
 const INITIAL_ATTACK = "GroundedPunch"
-const INITIAL_ATTACK_RANGE = 160.0
+const INITIAL_ATTACK_RANGE = 33.0
 const TOLERANCE_CLOSER = 0.65
-const TOLERANCE_FURTHER_PX = 35.0
+const TOLERANCE_FURTHER_PX = 10.0
 
 # Combo sequence — these are placeholder names; update to match actual Bandit state names.
 # If a step's action isn't available the combo resets automatically (NPCAICombo behaviour).
