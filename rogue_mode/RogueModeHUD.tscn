@@ -1,0 +1,32 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://_YOMI_Rogue/rogue_mode/RogueModeHUD.gd" type="Script" id=1]
+
+[node name="RogueModeHUD" type="CanvasLayer"]
+script = ExtResource(1)
+layer = 100
+
+[node name="VBox" type="VBoxContainer" parent="."]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 320.0
+offset_bottom = 120.0
+
+[node name="WaveLabel" type="Label" parent="VBox"]
+text = "Wave 1 / 10"
+
+[node name="PlayerHPBar" type="ProgressBar" parent="VBox"]
+rect_min_size = Vector2(200, 18)
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyBarsContainer" type="HBoxContainer" parent="VBox"]
+[node name="BannerLabel" type="Label" parent="VBox"]
+visible = false
+text = "Wave Complete!"
+align = 1
+vertical_align = 1
+
+[node name="BannerTimer" type="Timer" parent="."]
+one_shot = true
