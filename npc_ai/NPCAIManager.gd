@@ -14,7 +14,7 @@ const CHARACTER_AI_MAP = {
 }
 
 # Default fallback script path used when the character has no entry in CHARACTER_AI_MAP.
-const DEFAULT_AI_SCRIPT_PATH = "res://_YOMI_Rogue/npc_ai/NPCAIBase.gd"
+const DEFAULT_AI_SCRIPT_PATH = "res://_YOMI_Rogue/npc_ai/characters/BanditAI.gd"
 
 # Whether players have been registered yet (deferred to first signal).
 var _registered: bool = false
@@ -51,13 +51,16 @@ func _on_player_actionable():
 
 
 func _register_npc_players(game):
-	# Standard matches use player ids 1 and 2.
-	# game.get_player(id) returns null for any slot that doesn't exist.
-	for id in [1, 2]:
+	# When game has a players dict (e.g. MultiHustle or RogueGame), register for all ids != 1.
+	# Otherwise standard 1v1: only id 2.
+	var ids_to_check = [1, 2]
+	if game.get("players") is Dictionary and game.players.size() > 0:
+		ids_to_check = game.players.keys()
+	for id in ids_to_check:
 		var player = game.get_player(id)
 		if player == null:
 			continue
-		if not _should_control(player):
+		if not _should_control(player, game):
 			continue
 		var controller = _create_controller_for(player, game)
 		controllers[player.id] = controller
@@ -69,9 +72,11 @@ func _register_npc_players(game):
 # ── Overridable hooks ─────────────────────────────────────────────────────────
 
 # Returns true for any player that should be NPC-controlled.
-# Default: control player id 2 (the non-human slot in singleplayer).
-# Override this method in a subclass of NPCAIManager for more complex logic.
-func _should_control(player) -> bool:
+# When game has multiple players (players dict), control all ids != 1 (rogue multi-enemy).
+# Otherwise control player id 2 (the non-human slot in singleplayer).
+func _should_control(player, game) -> bool:
+	if game.get("players") is Dictionary and game.players.size() > 1:
+		return player.id != 1
 	return player.id == 2
 
 
